@@ -397,31 +397,6 @@ func Example() {
 	// Output: go -C adapters/postgres test -race -count=20 -v ./...
 }
 
-func TestMigrationReapplicationAndDrift(t *testing.T) {
-	db := integrationDB(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	// integrationDB already proves that applying the embedded migrations twice
-	// is a no-op. Mutate only this disposable schema's recorded checksum to
-	// prove the runner rejects source/history drift instead of guessing a repair.
-	result, err := db.ExecContext(ctx,
-		`UPDATE sgsp_schema_migrations SET checksum=$1 WHERE version=$2`,
-		[]byte{0}, "001_group_assignments")
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rows != 1 {
-		t.Fatalf("updated migration records = %d, want 1", rows)
-	}
-	if err := adapter.ApplyMigrations(ctx, db); !errors.Is(err, adapter.ErrMigrationDrift) {
-		t.Fatalf("ApplyMigrations after checksum drift = %v, want ErrMigrationDrift", err)
-	}
-}
-
 func peerDB(t *testing.T, db *sql.DB) *sql.DB {
 	t.Helper()
 	var schema string
@@ -437,30 +412,6 @@ func peerDB(t *testing.T, db *sql.DB) *sql.DB {
 	peer.SetMaxOpenConns(integrationMaxOpenConns)
 	t.Cleanup(func() { peer.Close() })
 	return peer
-}
-
-func TestAdoptLegacyMigrationHistory(t *testing.T) {
-	db := integrationDB(t)
-	store, err := adapter.New(db)
-	if err != nil {
-		t.Fatal(err)
-	}
-	group := placement.GroupID{App: sgsp.AppIdentity{ID: "legacy", Version: "1"}, Key: "kept"}
-	owner := integrationOwner(1)
-	if _, err := store.Assign(context.Background(), group, owner); err != nil {
-		t.Fatal(err)
-	}
-	// Removing only Goose's bookkeeping recreates the original adapter schema.
-	if _, err := db.Exec("DROP TABLE goose_db_version"); err != nil {
-		t.Fatal(err)
-	}
-	if err := adapter.ApplyMigrations(context.Background(), db); err != nil {
-		t.Fatal(err)
-	}
-	got, err := store.Get(context.Background(), group)
-	if err != nil || got.Owner != owner {
-		t.Fatalf("legacy assignment lost: %#v %v", got, err)
-	}
 }
 
 func processDSN(t *testing.T, db *sql.DB) string {

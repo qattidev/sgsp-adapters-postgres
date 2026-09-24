@@ -63,14 +63,9 @@ Set `SGSP_TEST_DATABASE_URL` to a disposable PostgreSQL database for tests.
 Tests create/drop unique schemas; a missing URL fails instead of skipping.
 `scripts/run-integration.sh` retains test evidence under `artifacts/`.
 
-### Existing SGSP PostgreSQL databases
+### Migrations
 
-Change imports from `qattidev/sgsp/placement/postgres` to
-`qattidev/sgsp-postgres`. ApplyMigrations verifies the original
-`sgsp_schema_migrations` checksum before adopting the schema into Goose's
-`goose_db_version`. Existing assignment data is preserved. The original SQL is
-retained under `legacy/` for this checksum; do not edit it. The legacy drift
-check remains; subsequent migration version tracking is owned by Goose.
+Goose owns migration history in `goose_db_version`.
 Never run a Down migration on production assignment data: deleting closed
 records permits forbidden group-key reuse. Schema deployments are serialized
 by the application; runtime stores do not run migrations automatically.

@@ -21,9 +21,3 @@ type SgspGroupAssignment struct {
 	CreatedAt          time.Time
 	ClosedAt           sql.NullTime
 }
-
-type SgspSchemaMigration struct {
-	Version   string
-	Checksum  []byte
-	AppliedAt time.Time
-}
