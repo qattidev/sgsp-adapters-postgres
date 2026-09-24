@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -224,7 +225,7 @@ func TestConcurrentBootstrapResolve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondStore, err := adapter.New(db)
+	secondStore, err := adapter.New(peerDB(t, db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +302,7 @@ func TestBootstrapCloseRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondStore, err := adapter.New(db)
+	secondStore, err := adapter.New(peerDB(t, db))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,4 +461,29 @@ func TestAdoptLegacyMigrationHistory(t *testing.T) {
 	if err != nil || got.Owner != owner {
 		t.Fatalf("legacy assignment lost: %#v %v", got, err)
 	}
+}
+
+func processDSN(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	var schema string
+	if err := db.QueryRow("SELECT current_schema()").Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	// Build a URL from the parsed config so keyword/value input is supported too.
+	config, err := pgx.ParseConfig(os.Getenv("SGSP_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal("invalid test database URL")
+	}
+	u := url.URL{Scheme: "postgres", User: url.UserPassword(config.User, config.Password), Host: fmt.Sprintf("%s:%d", config.Host, config.Port), Path: "/" + config.Database}
+	values := url.Values{"search_path": {schema}, "sslmode": {"disable"}}
+	if config.TLSConfig != nil {
+		values.Set("sslmode", "require")
+	}
+	if strings.HasPrefix(config.Host, "/") {
+		u.Host = ""
+		values.Set("host", config.Host)
+		values.Set("port", fmt.Sprint(config.Port))
+	}
+	u.RawQuery = values.Encode()
+	return u.String()
 }
