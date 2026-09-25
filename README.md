@@ -69,3 +69,9 @@ Goose owns migration history in `goose_db_version`.
 Never run a Down migration on production assignment data: deleting closed
 records permits forbidden group-key reuse. Schema deployments are serialized
 by the application; runtime stores do not run migrations automatically.
+
+## License
+
+Copyright 2026 Johannes Sarpola.
+
+SGSP postgres assignment store is licensed under the [Apache License, Version 2.0](LICENSE).
